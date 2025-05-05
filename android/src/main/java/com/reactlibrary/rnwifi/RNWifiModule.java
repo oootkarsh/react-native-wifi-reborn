@@ -633,13 +633,12 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
 
         NetworkRequest nr = new NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) // Ensure internet capability
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-                //.addCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
                 .setNetworkSpecifier(wifiNetworkSpecifier.build())
                 .build();
 
-        // cleanup previous connections just in case
+        // Cleanup previous connections just in case
         DisconnectCallbackHolder.getInstance().disconnect();
 
         joinedNetwork = null;
@@ -662,12 +661,15 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
                 timeoutHandler.removeCallbacks(timeoutRunnable);
                 joinedNetwork = network;
                 DisconnectCallbackHolder.getInstance().bindProcessToNetwork(network);
-                //connectivityManager.setNetworkPreference(ConnectivityManager.DEFAULT_NETWORK_PREFERENCE);
-                if (!pollForValidSSID(3, SSID)) {
-                    promise.reject(ConnectErrorCodes.android10ImmediatelyDroppedConnection.toString(), "Firmware bugs on OnePlus prevent it from connecting on some firmware versions.");
-                    return;
-                }
-                promise.resolve("connected");
+
+                // Allow connection to stabilize
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (!pollForValidSSID(3, SSID)) {
+                        promise.reject(ConnectErrorCodes.android10ImmediatelyDroppedConnection.toString(), "Firmware bugs on some devices prevent stable connection.");
+                        return;
+                    }
+                    promise.resolve("connected");
+                }, 3000); // 3-second delay
             }
 
             @Override
